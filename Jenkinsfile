@@ -1,43 +1,25 @@
-node{
-     
-    stage('SCM Checkout'){
-        git url: 'https://github.com/MithunTechnologiesDevOps/java-web-app-docker.git',branch: 'master'
+node {
+    def buildNumber = BUILD_NUMBER
+    stage("Git clone"){
+        git url:'https://github.com/vishnupriyan3595/java-web-app-docker.git',branch:'master'
     }
-    
-    stage(" Maven Clean Package"){
-      def mavenHome =  tool name: "Maven-3.5.6", type: "maven"
-      def mavenCMD = "${mavenHome}/bin/mvn"
-      sh "${mavenCMD} clean package"
-      
-    } 
-    
-    
-    stage('Build Docker Image'){
-        sh 'docker build -t dockerhandson/java-web-app .'
+    stage("maven clean package"){
+        def mavenHome= tool name: "maven",type: "maven"
+        sh "${mavenHome}/bin/mvn clean package"
     }
-    
-    stage('Push Docker Image'){
-        withCredentials([string(credentialsId: 'Docker_Hub_Pwd', variable: 'Docker_Hub_Pwd')]) {
-          sh "docker login -u dockerhandson -p ${Docker_Hub_Pwd}"
+    stage ("Build Docker Image"){
+        sh "docker build -t vishnu3595/java-web-app-docker:${buildNumber}  ."
+    }
+    stage ("Docker Login and Push"){
+        withCredentials([string(credentialsId: 'vishnu3595', variable: 'vishnu3595')]) {
+        sh "docker login -u vishnu3595 -p ${vishnu3595}"
         }
-        sh 'docker push dockerhandson/java-web-app'
-     }
-     
-      stage('Run Docker Image In Dev Server'){
-        
-        def dockerRun = ' docker run  -d -p 8080:8080 --name java-web-app dockerhandson/java-web-app'
-         
-         sshagent(['DOCKER_SERVER']) {
-          sh 'ssh -o StrictHostKeyChecking=no ubuntu@172.31.20.72 docker stop java-web-app || true'
-          sh 'ssh  ubuntu@172.31.20.72 docker rm java-web-app || true'
-          sh 'ssh  ubuntu@172.31.20.72 docker rmi -f  $(docker images -q) || true'
-          sh "ssh  ubuntu@172.31.20.72 ${dockerRun}"
-       }
-       
+        sh "docker push vishnu3595/java-web-app-docker:${buildNumber}"
     }
-     FROM tomcat:latest
-# Dummy text to test 
-COPY target/java-web-app-docker*.war /usr/local/tomcat/webapps/java-web-app-docker.war
-     
-     
+    stage ("Deploy Application"){
+        sshagent(['ubuntu']) {
+    sh "ssh -o StrictHostKeyChecking=no ubuntu@172.31.44.45 docker rm -f javawebappcontainer || true"
+    sh "ssh -o StrictHostKeyChecking=no ubuntu@172.31.44.45 docker run -d -p 8080:8080 --name javawebappcontainer vishnu3595/java-web-app-docker:${buildNumber}"
+     }
+    }
 }
